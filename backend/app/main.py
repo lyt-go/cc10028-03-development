@@ -5,14 +5,28 @@
 """
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.routers import ROUTERS
+from app.services.coverage import CoverageService
 from app.store import store
 
-app = FastAPI(title="文档解析与知识抽取平台", version="1.0.0")
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    """启动时幂等准备识别覆盖演示文档，保证版式还原页一打开就有数据可看。"""
+    try:
+        CoverageService().ensure_demo()
+    except Exception:  # 演示数据失败不应阻止服务启动
+        pass
+    yield
+
+
+app = FastAPI(title="文档解析与知识抽取平台", version="1.0.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,

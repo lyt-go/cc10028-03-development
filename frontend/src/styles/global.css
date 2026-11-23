@@ -70,3 +70,39 @@ body { margin: 0; background: #f6f8fb; color: #1f2937; }
 .analysis-chart { display: flex; align-items: flex-end; gap: 8px; height: 160px; padding: 12px 0; }
 .analysis-bar { flex: 1; border-radius: 4px 4px 0 0; background: var(--brand); min-width: 24px; position: relative; transition: height 0.4s; }
 .analysis-bar span { position: absolute; bottom: -20px; left: 50%; transform: translateX(-50%); font-size: 10px; color: var(--muted); white-space: nowrap; }
+/* 识别区域覆盖图 */
+.coverage-legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 12px; color: var(--muted); margin: 0 0 10px; }
+.legend-item { display: inline-flex; align-items: center; gap: 6px; }
+.legend-swatch { width: 12px; height: 12px; border-radius: 3px; border: 1px solid var(--border); display: inline-block; }
+.legend-swatch.state-recognized { background: #d1fae5; border-color: #10b981; }
+.legend-swatch.state-pending { background: #fef3c7; border-color: #f59e0b; }
+.legend-swatch.state-unconfirmed { background: #ede9fe; border-color: #8b5cf6; }
+.legend-swatch.state-no_text { background: #e5e7eb; border-color: #9ca3af; }
+.legend-swatch.legend-overlap { background: repeating-linear-gradient(45deg, #fca5a5 0 4px, #fff 4px 8px); border-color: #ef4444; }
+.coverage-stages { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+.coverage-stage { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; font-size: 13px; }
+.coverage-stage small { color: var(--muted); font-size: 11px; }
+.coverage-stage.active { border-color: var(--brand); color: var(--brand); box-shadow: 0 0 0 1px var(--brand) inset; }
+.coverage-note { font-size: 12px; color: var(--muted); margin: 0 0 12px; }
+.coverage-toast { font-size: 12px; color: #047857; margin: 0 0 8px; }
+.coverage-page-card { background: #fff; border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; margin-bottom: 14px; }
+.coverage-page-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.coverage-page-head h3 { font-size: 15px; margin: 0; }
+.coverage-page-meta { font-size: 12px; color: var(--muted); }
+.coverage-canvas { position: relative; height: 460px; margin: 10px 0 14px; border: 1px dashed var(--border); border-radius: 8px; background: #fbfcfe; overflow: hidden; }
+.coverage-region { position: absolute; border: 2px solid #94a3b8; border-radius: 6px; padding: 6px 8px; overflow: hidden; font-size: 12px; box-sizing: border-box; background: rgb(255 255 255 / 82%); }
+.coverage-region.state-recognized { border-color: #10b981; background: rgb(209 250 229 / 55%); }
+.coverage-region.state-pending { border-color: #f59e0b; border-style: dashed; background: rgb(254 243 199 / 60%); }
+.coverage-region.state-unconfirmed { border-color: #8b5cf6; border-style: dotted; background: rgb(237 233 254 / 60%); }
+.coverage-region.state-no_text { border-color: #9ca3af; background: repeating-linear-gradient(45deg, #f3f4f6 0 6px, #e5e7eb 6px 12px); color: #6b7280; }
+.coverage-region-tag { display: inline-block; font-weight: 600; margin-bottom: 4px; }
+.coverage-region-text { display: block; line-height: 1.5; color: #065f46; word-break: break-all; }
+.coverage-region-hint { display: block; color: var(--muted); line-height: 1.5; }
+.coverage-region-badge { position: absolute; right: 6px; bottom: 6px; font-size: 10px; padding: 1px 5px; border-radius: 999px; background: #065f46; color: #fff; }
+.coverage-overlap { position: absolute; background: repeating-linear-gradient(45deg, rgb(239 68 68 / 35%) 0 5px, transparent 5px 10px); border: 1px dashed #ef4444; pointer-events: none; border-radius: 4px; }
+.coverage-duplicate { position: absolute; border: 1px dashed #ef4444; background: rgb(254 226 226 / 88%); color: #b91c1c; font-size: 10px; line-height: 1.2; padding: 1px 3px; border-radius: 3px; overflow: hidden; }
+.coverage-reading h4, .coverage-pending h4 { font-size: 13px; margin: 0 0 6px; }
+.coverage-reading ol { margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.8; }
+.coverage-reading small { color: var(--muted); margin-left: 6px; }
+.coverage-seq { display: inline-block; min-width: 20px; color: var(--brand); font-variant-numeric: tabular-nums; }
+.coverage-pending ul { margin: 0; padding-left: 18px; font-size: 12px; color: var(--muted); line-height: 1.7; }

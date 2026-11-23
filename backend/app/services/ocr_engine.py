@@ -8,6 +8,7 @@ import time
 from typing import Any
 
 from app.services.base import BaseModuleService
+from app.services.coverage import CoverageService
 from app.store import store
 
 
@@ -34,11 +35,23 @@ class OcrEngineService(BaseModuleService):
         layout_file = self._data_dir("layout") / f"{image_area_id}_layout.jsonl"
         layout_records = self._read_jsonl(layout_file)
 
-        # 读取图片区域定义文件
+        # 读取图片区域定义文件；只识别当前版式的图块，避免把旧版区域重复识别
         image_file = self._data_dir("layout") / f"{image_area_id}_images.jsonl"
-        images = self._read_jsonl(image_file)
-        if not images:
+        all_regions = self._read_jsonl(image_file)
+        if not all_regions:
             return {"error": f"图片区域文件 {image_area_id} 不存在或为空"}
+
+        coverage_service = CoverageService()
+        layout_version = coverage_service.latest_version(image_area_id)
+        versioned = [row for row in all_regions if row.get("layout_version")]
+        images = [
+            row for row in (versioned or all_regions)
+            if str(row.get("layout_version") or layout_version) == layout_version
+            and not row.get("no_text")
+            and str(row.get("kind") or row.get("type") or "image") not in ("decoration", "separator")
+        ]
+        if not images:
+            return {"error": f"图片区域文件 {image_area_id} 没有当前版式 {layout_version} 的区域"}
 
         engine = "paddle"  # 当前识别引擎
         recognized = []
@@ -52,11 +65,14 @@ class OcrEngineService(BaseModuleService):
 
             recognized.append({
                 "image_area": img.get("page", 0),
+                "page": img.get("page", 0),
+                "region_id": img.get("region_id", ""),
                 "bbox": bbox,
                 "language": lang,
                 "precision": precision,
                 "recognized_text": text_output,
                 "confidence": confidence,
+                "layout_version": layout_version,
                 "engine": engine,
                 "engine_version": self.ENGINE_PRESETS[engine]["version"],
                 "recognized_at": time.time(),
@@ -65,6 +81,10 @@ class OcrEngineService(BaseModuleService):
         output_path = self._data_dir("ocr") / f"{image_area_id}_ocr.jsonl"
 # 数据产物：OCR识别结果数据写入ocr目录持久化文件
         written = self._write_jsonl(output_path, recognized)
+
+        # 识别完成后刷新识别区域覆盖图，下游版式重排直接读取最新结论
+        coverage = coverage_service.build(image_area_id, layout_version, persist=True,
+                                          note="OCR识别完成后的覆盖视图")
 
         # 写入检查点
         self._write_checkpoint(f"ocr_{image_area_id}", {
@@ -80,6 +100,7 @@ class OcrEngineService(BaseModuleService):
             "images_processed": len(images),
             "records_written": written,
             "output": str(output_path),
+            "coverage": coverage["summary"],
         }
 
     def _simulate_ocr_result(self, bbox: str, language: str) -> str:

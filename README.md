@@ -16,7 +16,10 @@
 │   └── vite.config.ts        dev server 配置（open: false）
 ├── backend/                  FastAPI（Python） 后端
 │   ├── app/routers/resource.py  通用查询/导出/登记/动作接口
+│   ├── app/routers/coverage.py  识别区域覆盖图接口
 │   ├── app/services/<key>.py    每个模块独立领域逻辑
+│   ├── app/services/coverage.py         覆盖图读写与阶段编排
+│   ├── app/services/coverage_engine.py  坐标/版本/去重纯计算
 │   ├── app/services/base.py     共享服务骨架
 │   └── app/store.py          内存数据仓库与示例数据
 ├── .gitignore
@@ -76,6 +79,32 @@ npm run dev
   `frontend/src/domain/<模块>.ts`，用于承载真实业务差异并维持36题位容量。
 - 列表接口统一返回 `{ items, total, page, size }`，动作接口统一返回 `{ ok, message }`。
 - 状态流转只允许在 `app/services` 里改，路由层不做业务判断。
+
+## 识别区域覆盖图
+
+版式还原只给出图片区域边界，判断不了某块区域是否已经有文字。覆盖图读取 OCR
+识别结论，按页生成覆盖视图（页面入口：`/layout-coverage`，接口前缀
+`/api/layout-coverage`）：
+
+| 区域状态 | 含义 | 是否进入阅读顺序 |
+| --- | --- | --- |
+| 已识别 | 当前版式下有可用文字；旧版识别完整落在区域内可继续沿用 | 是 |
+| 待识别 | 尚无可用识别结果，或旧识别只覆盖了一部分 | 否，坐标保留到版式页 |
+| 待确认 | 有识别候选但置信度不足/归属不可靠 | 否，需人工确认 |
+| 无文字 | 区域被明确标注为装饰、分隔线等 | 否，与“待确认”严格区分 |
+
+归属判定用两套比例：识别框落在区域内的比例（归属），以及区域被识别框盖住的比例
+（覆盖）。同一页两块区域交叠时，按阅读顺序先到先得，后出现的同坐标同名词块判为
+重复，只在读序里计一次。
+
+版式重排（`LayoutRestoreService.restore_from_document` 与
+`POST /api/layout-coverage/{doc}/reorganize`）读取覆盖图：可确认文本写入
+`reading_order_blocks` / `confirmed_text`，待识别坐标写入 `pending_bboxes` /
+`pending_regions`，保留在对应版式页。
+
+演示文档 `DEMO-COVERAGE` 在服务启动时自动生成，可按
+“旧布局（v1）→ 改版后（v2，左右图块交叠、旧识别只覆盖左侧）→ 补识别后”三个
+阶段顺序查看；`POST /api/layout-coverage/demo/revised` 可退回改版后状态重演。
 
 领域：数据工程
 子方向：数据采集、爬虫与RPA

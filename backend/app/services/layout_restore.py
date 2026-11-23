@@ -8,6 +8,7 @@ import time
 from typing import Any
 
 from app.services.base import BaseModuleService
+from app.services.coverage import DEFAULT_VERSION, STAGE_SUPPLEMENTED, CoverageService
 from app.store import store
 
 
@@ -15,7 +16,7 @@ class LayoutRestoreService(BaseModuleService):
     MODULE = "layout_restore"
     ENTITY = "版式结构"
     OPERATION_TERM = "还原"
-    LIST_FIELDS = ["文档编号", "段落结构", "标题层级", "表格区域", "图片区域", "阅读顺序", "还原算法", "还原版本"]
+    LIST_FIELDS = ["文档编号", "段落结构", "标题层级", "表格区域", "图片区域", "阅读顺序", "识别覆盖", "还原算法", "还原版本"]
     REQUIRED_FIELDS = ["文档编号", "段落结构", "标题层级"]
     STATUS_ORDER = ["草稿", "待还原", "已还原", "还原异常"]
     ACTION_RULES = {"启动还原": "待还原", "确认还原": "已还原", "标记异常": "还原异常"}
@@ -44,19 +45,35 @@ class LayoutRestoreService(BaseModuleService):
 
         algorithm = "hybrid"  # 当前使用的还原算法
 
+        # 读取识别区域覆盖图：只有覆盖视图能回答“这块图块里是否已有可用文字”
+        coverage = CoverageService()
+        version = coverage.latest_version(doc_id)
+        coverage_view = coverage.build(doc_id, version, note="版式还原读取识别区域覆盖图")
+        coverage_pages = {int(p["page"]): p for p in coverage_view["pages"]}
+
         # 还原版式结构并写入产物
         layout_records = []
         for rec in parsed_records:
-            page_tables = [t for t in tables if t.get("page") == rec.get("page_num")]
-            page_images = [img for img in images if img.get("page") == rec.get("page_num")]
+            page_num = rec.get("page_num")
+            page_tables = [t for t in tables if t.get("page") == page_num]
+            page_images = [img for img in images if img.get("page") == page_num]
+            page_coverage = coverage_pages.get(int(page_num or 0), {})
             layout_records.append({
                 "doc_id": rec["doc_id"],
-                "page": rec["page_num"],
+                "page": page_num,
                 "paragraph_count": rec["paragraphs"],
                 "title_levels": self._infer_title_levels(rec["page_num"]),
                 "table_bboxes": [t.get("bbox") for t in page_tables],
                 "image_bboxes": [img.get("bbox") for img in page_images],
                 "reading_order": self._infer_reading_order(page_tables, page_images),
+                # 覆盖视图消费结果：可确认文本进入阅读顺序，待识别坐标留在本页
+                "reading_order_blocks": page_coverage.get("reading_order", []),
+                "confirmed_text": page_coverage.get("confirmed_text", ""),
+                "reading_order_seq": len(page_coverage.get("reading_order", [])),
+                "pending_bboxes": [item["bbox"] for item in page_coverage.get("pending_regions", [])],
+                "pending_regions": page_coverage.get("pending_regions", []),
+                "coverage_counts": page_coverage.get("state_counts", {}),
+                "coverage_version": version,
                 "algorithm": algorithm,
                 "text_length": rec["text_length"],
             })
@@ -65,6 +82,10 @@ class LayoutRestoreService(BaseModuleService):
         written = self._write_jsonl(output_path, layout_records)
 # 数据产物：还原后的版式结构写入layout目录持久化文件
 
+        # 覆盖视图同时落盘，后续重排/补识别都以它为准
+        coverage_persisted = coverage.build(doc_id, version, persist=True,
+                                            note="版式还原产物对应的识别区域覆盖图")
+
         # 写入检查点
         self._write_checkpoint(f"layout_{doc_id}", {
             "doc_id": doc_id,
@@ -72,6 +93,8 @@ class LayoutRestoreService(BaseModuleService):
             "algorithm": algorithm,
             "tables_detected": len(tables),
             "images_detected": len(images),
+            "coverage_version": version,
+            "coverage": coverage_persisted["summary"],
         })
 
         # 跨模块自动触发
@@ -93,6 +116,7 @@ class LayoutRestoreService(BaseModuleService):
             "pages": len(layout_records),
             "records_written": written,
             "output": str(output_path),
+            "coverage": coverage_persisted["summary"],
             "triggers": triggers,
         }
 
